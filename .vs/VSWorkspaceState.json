@@ -1,0 +1,12 @@
+{
+  "ExpandedNodes": [
+    "",
+    "\\database",
+    "\\database\\models",
+    "\\pages",
+    "\\pages\\recover-password",
+    "\\utils"
+  ],
+  "SelectedNode": "\\database\\models\\user.js",
+  "PreviewInSolutionExplorer": false
+}

@@ -1,0 +1,256 @@
+import Head from 'next/head'
+import { useEffect, useState } from 'react';
+import apiClient from '@/apiClient';
+import { Box, Button, Container, FormControl, Grid, InputLabel, MenuItem, Paper, Select, TextField } from '@mui/material';
+import MediaCard from '@/components/ui/productCard';
+import Swal from 'sweetalert2';
+import ButtonAppBar from '@/components/Navbar';
+import BreadCrumbs from '@/components/ui/Breadcumbs';
+import Slider from '@/components/slider';
+import { useSession } from "next-auth/react";
+import Footer from '@/components/ui/footer';
+
+export default function Inventory() {
+  const { data: session, status } = useSession();
+
+  const images = Array.from(Array(5).keys()).map(i => `/images/image-${i}.jpg`)
+
+  const [originalProducts, setOriginalProducts] = useState();
+  const [products, setProducts] = useState([]);
+  const [categories, setCategories] =  useState([]);
+  const [categorySelected, setCategorySelected] = useState("");
+  const [search, setSearchProducts] = useState("");
+  const [eliminar, setDelete] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  console.log(session);
+
+
+  const deleteProduct = (id) => {
+    console.log(id)
+    
+    Swal.fire({
+      position: 'center',
+      icon: 'success',
+      title: 'Producto Eliminado',
+      showConfirmButton: false,
+      timer: 5000
+    })
+  
+    apiClient.delete(`/api/products?id=${id}`)
+    .then(response => {
+      console.log(response.data);
+      apiClient.post('/api/products')
+      .then(response => {
+        console.log(response.data);
+        setOriginalProducts(response.data || []);
+        setProducts(response.data || []);
+      })
+      .catch(error => {
+        console.log(error);
+      });
+    })
+    .catch (error => {
+      console.error(error);
+    });    
+  }
+
+    const updateProduct = (id, info, index) => {
+      apiClient.put(`/api/products?id=${id}`, info)
+        .then(response => {
+          Swal.fire({
+            position: 'center',
+            icon: 'success',
+            text: response.data.message,
+            confirmButtonText: "Aceptar"
+          }).then((result) => {
+            if(result.isConfirmed){
+              const producstCopy = [...products];
+              producstCopy.splice(index, 1, response.data.product)
+              setProducts(producstCopy);
+            }
+          })
+        })
+        .catch(error => {
+          console.log(error);
+          /* alert(error.response.data.message)
+          if(error.response.data.errors){
+            error.response.data.errors.forEach((errorItem) => {
+              setError(errorItem.field, {
+                type: "validation",
+                message: errorItem.error
+              })
+            });
+          } */
+        });
+    };
+
+  const petGet = async () => {
+    apiClient.post('/api/products')
+    .then(response => {
+      console.log(response.data);
+      setOriginalProducts(response.data || []);
+      setProducts(response.data || []);
+      setIsLoading(false);
+    })
+    .catch(error => {
+      console.log(error);
+    });
+  }
+
+
+  //categories peticion
+  useEffect(() => {
+    apiClient.get('/api/categories')
+    .then(response => {
+      setCategories(response.data || []);
+    })
+    .catch(error => {
+      console.log(error);
+    });
+
+  }, []);
+
+  useEffect(() => {
+    if (categorySelected) {
+      apiClient.get(`/api/products?categoryId=${categorySelected || null}`)
+      .then(response => { 
+        setProducts(response.data || []);
+      })
+      .catch(error => {
+        console.log(error);
+      });
+    }
+  }, [categorySelected]);
+
+  //funcion buscar-valores
+  const onSearchProducts = (e) => {
+    setSearchProducts(e.target.value);
+    filter(e.target.value);
+  }
+
+  //llamado de la funicon
+  useEffect(() => {petGet(); }, []);
+
+  const onSelectCategory = (e) => {
+    setCategorySelected(e.target.value);
+  }
+
+  if (!session) {
+    return (
+      <>
+        <Head>
+          <title>Acerca de</title>
+        </Head>
+        <Paper>
+          <h1 align='center'>Acceso denegado</h1>
+        </Paper>
+      </>
+    )
+  }
+
+
+  const filter = (wordSearch) => {
+    let resultSearch = originalProducts.filter((element) => {
+      if(element.description.toString().toLowerCase().includes(wordSearch.toLowerCase())
+      ) {
+        return true;
+      }
+      return false;
+    });
+    setProducts(resultSearch);
+    
+  }
+
+  const renderProducts = () => {
+    if (isLoading) {
+      return <p>Cargando productos...</p>;
+    }
+    if (!Array.isArray(products)) {
+      return null;
+    }
+       return products.map((product, index) =>(
+        <Grid item xs={12} lg={4} xl={2} key={product?.id}>
+          <MediaCard
+          index={index}
+          product={product}
+          //eliminar 
+          onDelete={deleteProduct}
+          onUpdate={updateProduct}
+          />
+       </Grid>
+  ))
+  };
+
+
+
+    return (
+      <>
+        <Head>
+            <title>Inventario</title>
+            <meta name="description" content="Generated by create next app" />
+            <meta name="viewport" content="width=device-width, initial-scale=1" />
+            <link rel="icon" href="/favicon.ico" />
+        </Head>
+        
+        <Paper>
+        <Box>
+        <ButtonAppBar/>
+          </Box>
+          <div sx={{marginBottom: 3,marginTop: 5}}>
+            <BreadCrumbs/>
+          </div>
+          <Container>
+          <h1 align="center" sx={{marginBottom: 3,marginTop: 5}}>Inventario</h1>
+            <Grid container spacing={2} sx={{marginBottom: 3,marginTop: 5}}>
+              <Grid item xs={6} md={2}>
+                <FormControl fullWidth>
+                  <InputLabel id="category-id">Categoria</InputLabel>
+                  <Select
+                    id="category-id"
+                    label="Categoria"
+                    value={categorySelected}
+                    onChange={onSelectCategory}
+                  >
+                    {categories.map((item) => (
+                      <MenuItem key={item?.id} value={item?.id}>{item.name}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+            </Grid>
+            <Grid item xs={6} md={2} sx={{marginBottom: 3,}}>
+                <FormControl>
+                  <TextField
+                    required
+                    id='search-id'
+                    label='Buscar'
+                    value={search}
+                    onChange={onSearchProducts}
+                  >
+                    {Array.isArray(products) && products.map((item) => {
+                      <MenuItem key={item?.id} value={item?.id}>{item?.description}</MenuItem>
+                    })}
+                  </TextField>
+                </FormControl>
+              </Grid>
+              {/* <Grid sx={{marginBottom: 3,marginTop: 5}}>
+                  <Slider 
+                  images={images}
+                  />
+              </Grid> */}
+              <Grid sx={{marginBottom: 3,marginTop: 5}}>
+                <Button align='left' variant='contained' href='/ddProduct'>Agregar Nuevo</Button>
+              </Grid>
+            <Grid container spacing={2}>
+                {renderProducts()}
+            </Grid>
+          
+          </Container>
+        </Paper>
+        <Footer/>
+        
+      </>
+    )
+  }
+
